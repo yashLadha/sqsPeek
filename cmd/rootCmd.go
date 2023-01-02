@@ -42,4 +42,5 @@ func addFlags(sess *execution.RunningSession) {
 	rootCmd.PersistentFlags().StringVarP(&sess.Region, "region", "r", "ap-south-1", "AWS Region for SQS")
 	rootCmd.PersistentFlags().StringVarP(&sess.FileName, "fileName", "f", "queue_messages.json", "File name to store the data")
 	rootCmd.PersistentFlags().StringVarP(&sess.Profile, "profile", "p", "DEFAULT", "AWS Profile to access account")
+	rootCmd.PersistentFlags().BoolVarP(&sess.PurgeQueue, "delete", "d", false, "Purge Messages in Queue")
 }

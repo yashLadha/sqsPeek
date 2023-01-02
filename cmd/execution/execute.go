@@ -98,6 +98,7 @@ func (s *RunningSession) Perform() {
 	s.triggerPollers()
 	s.wg.Wait()
 	s.createFile()
+	s.deleteMessages()
 }
 
 func (s *RunningSession) triggerPollers() {
@@ -118,4 +119,20 @@ func (s *RunningSession) createAWSSession() {
 	}
 
 	s.session = awsSession
+}
+
+func (s *RunningSession) deleteMessages() {
+	if s.PurgeQueue {
+		for _, item := range s.messages {
+			_, err := s.svc.DeleteMessage(&sqs.DeleteMessageInput{
+				QueueUrl:      &s.QueueArn,
+				ReceiptHandle: item.ReceiptHandle,
+			})
+			if err != nil {
+				fmt.Printf("Error received in deleting message %v\n", err)
+				os.Exit(1)
+			}
+		}
+		fmt.Printf("Purged %d records", len(s.messages))
+	}
 }
