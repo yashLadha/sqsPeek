@@ -15,15 +15,17 @@ import (
 const MaxMessage = 10
 
 type RunningSession struct {
-	session  *session.Session
-	svc      *sqs.SQS
-	messages []*sqs.Message
-	wg       *sync.WaitGroup
-	QueueArn string
-	FileName string
-	Profile  string
-	Region   string
-	pollSize int
+	session    *session.Session
+	svc        *sqs.SQS
+	messages   []*sqs.Message
+	wg         *sync.WaitGroup
+	QueueArn   string
+	FileName   string
+	Profile    string
+	Region     string
+	PurgeQueue bool
+	writeLock  *sync.Mutex
+	pollSize   int
 }
 
 func (s *RunningSession) initializeSQS() {
@@ -51,7 +53,9 @@ func (s *RunningSession) fetchMessagesFromSQS() {
 		curr += len(msgResult.Messages)
 
 		for _, item := range msgResult.Messages {
+			s.writeLock.Lock()
 			s.messages = append(s.messages, item)
+			s.writeLock.Unlock()
 		}
 
 		if curr == prev {
@@ -83,6 +87,7 @@ func (s *RunningSession) setPool() {
 	wg.Add(pollSize)
 	s.pollSize = pollSize
 	s.wg = &wg
+	s.writeLock = &sync.Mutex{}
 }
 
 // Perform executes the root command to purge the SQS
