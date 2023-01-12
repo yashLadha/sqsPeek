@@ -12,20 +12,23 @@ import (
 	"sync"
 )
 
+// MaxMessage is the maximum number of messages that can be
+// received from SQS, while doing ReceiveMessage call.
 const MaxMessage = 10
 
 type RunningSession struct {
-	session    *session.Session
-	svc        *sqs.SQS
-	messages   []*sqs.Message
-	wg         *sync.WaitGroup
-	QueueArn   string
-	FileName   string
-	Profile    string
-	Region     string
-	PurgeQueue bool
-	writeLock  *sync.Mutex
-	pollSize   int
+	session      *session.Session
+	svc          *sqs.SQS
+	messages     []*sqs.Message
+	wg           *sync.WaitGroup
+	QueueArn     string
+	FileName     string
+	Profile      string
+	Region       string
+	PurgeQueue   bool
+	writeLock    *sync.Mutex
+	pollSize     int
+	purgeChannel chan *sqs.Message
 }
 
 func (s *RunningSession) initializeSQS() {
@@ -39,7 +42,7 @@ func (s *RunningSession) startPolling() {
 func (s *RunningSession) fetchMessagesFromSQS() {
 	curr := 0
 	prev := 0
-	for true {
+	for {
 		msgResult, err := s.svc.ReceiveMessage(&sqs.ReceiveMessageInput{
 			QueueUrl:            &s.QueueArn,
 			MaxNumberOfMessages: aws.Int64(MaxMessage),
@@ -88,6 +91,7 @@ func (s *RunningSession) setPool() {
 	s.pollSize = pollSize
 	s.wg = &wg
 	s.writeLock = &sync.Mutex{}
+	s.purgeChannel = make(chan *sqs.Message)
 }
 
 // Perform executes the root command to purge the SQS
@@ -123,16 +127,48 @@ func (s *RunningSession) createAWSSession() {
 
 func (s *RunningSession) deleteMessages() {
 	if s.PurgeQueue {
-		for _, item := range s.messages {
-			_, err := s.svc.DeleteMessage(&sqs.DeleteMessageInput{
-				QueueUrl:      &s.QueueArn,
-				ReceiptHandle: item.ReceiptHandle,
-			})
-			if err != nil {
-				fmt.Printf("Error received in deleting message %v\n", err)
-				os.Exit(1)
-			}
+		for idx := 0; idx < s.pollSize; idx++ {
+			s.wg.Add(1)
+			go s.purgeConsumer()
 		}
+		go s.purgeProducer()
+		s.wg.Wait()
 		fmt.Printf("Purged %d records", len(s.messages))
+	}
+}
+
+func (s *RunningSession) purgeProducer() {
+	for _, item := range s.messages {
+		s.purgeChannel <- item
+	}
+	close(s.purgeChannel)
+}
+
+func (s *RunningSession) purgeConsumer() {
+	defer s.wg.Done()
+	var deleteBatch []*sqs.DeleteMessageBatchRequestEntry
+	for item := range s.purgeChannel {
+		deleteBatch = append(deleteBatch, &sqs.DeleteMessageBatchRequestEntry{
+			Id:            item.MessageId,
+			ReceiptHandle: item.ReceiptHandle,
+		})
+	}
+	for idx := 0; idx < len(deleteBatch); {
+		var batch []*sqs.DeleteMessageBatchRequestEntry
+		for cnt := 0; cnt < MaxMessage && idx < len(deleteBatch); cnt, idx = cnt+1, idx+1 {
+			batch = append(batch, deleteBatch[idx])
+		}
+		s.performBatchDelete(batch)
+	}
+}
+
+func (s *RunningSession) performBatchDelete(deleteBatch []*sqs.DeleteMessageBatchRequestEntry) {
+	_, err := s.svc.DeleteMessageBatch(&sqs.DeleteMessageBatchInput{
+		Entries:  deleteBatch,
+		QueueUrl: &s.QueueArn,
+	})
+	if err != nil {
+		fmt.Printf("Error received in batch delete: %v\n", err)
+		os.Exit(1)
 	}
 }
