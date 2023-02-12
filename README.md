@@ -48,6 +48,9 @@ We can delete the messages from remote URL, if we want to drain it.
 sqsPeek -q $QUEUE_NAME -d
 ```
 
+### Download
+
+You can download latest binaries from [here](https://github.com/yashLadha/sqsPeek/releases)
 
 ### Development
 
