@@ -1,0 +1,52 @@
+name: Head Release
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  prepare:
+    name: Prepare Head Release
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Recreate head tag and release
+        run: |
+          gh release delete head --yes --cleanup-tag 2>/dev/null || true
+          git tag -f head
+          git push -f origin head
+          gh release create head --title "Head Release" --notes "Built from latest commit on main" --prerelease
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  releases-matrix:
+    name: Release Go Binary
+    needs: prepare
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        goos: [linux, windows, darwin]
+        goarch: ["386", amd64, arm64]
+        exclude:
+          - goarch: "386"
+            goos: darwin
+          - goarch: arm64
+            goos: windows
+    steps:
+      - uses: actions/checkout@v4
+      - uses: wangyoucao577/go-release-action@v1.55
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          goos: ${{ matrix.goos }}
+          goarch: ${{ matrix.goarch }}
+          goversion: "1.26.0"
+          binary_name: "sqsPeek"
+          build_flags: -v
+          ldflags: -s -w
+          release_tag: head
+          overwrite: true
+        env:
+          CGO_ENABLED: 0
