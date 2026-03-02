@@ -25,7 +25,7 @@ jobs:
           goarch: ${{ matrix.goarch }}
           goversion: "1.26.0"
           binary_name: "sqsPeek"
-          extra_files: LICENSE README.md
+          extra_files: README.md
           build_flags: -v
           ldflags: -s -w
         env:
