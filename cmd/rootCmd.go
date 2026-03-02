@@ -43,4 +43,5 @@ func addFlags(sess *execution.RunningSession) {
 	rootCmd.PersistentFlags().StringVarP(&sess.FileName, "fileName", "f", "queue_messages.json", "File name to store the data")
 	rootCmd.PersistentFlags().StringVarP(&sess.Profile, "profile", "p", "DEFAULT", "AWS Profile to access account")
 	rootCmd.PersistentFlags().BoolVarP(&sess.PurgeQueue, "delete", "d", false, "Purge Messages in Queue")
+	rootCmd.PersistentFlags().BoolVarP(&sess.Verbose, "verbose", "v", false, "Enable verbose logging")
 }

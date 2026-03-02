@@ -3,6 +3,7 @@ package execution
 import (
 	"encoding/json"
 	"fmt"
+	"log"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/credentials"
 	"github.com/aws/aws-sdk-go/aws/session"
@@ -26,13 +27,21 @@ type RunningSession struct {
 	Profile      string
 	Region       string
 	PurgeQueue   bool
+	Verbose      bool
 	writeLock    *sync.Mutex
 	pollSize     int
 	purgeChannel chan *sqs.Message
 }
 
+func (s *RunningSession) logVerbose(format string, args ...interface{}) {
+	if s.Verbose {
+		log.Printf(format, args...)
+	}
+}
+
 func (s *RunningSession) initializeSQS() {
 	s.svc = sqs.New(s.session)
+	s.logVerbose("SQS client initialized for queue: %s", s.QueueArn)
 }
 
 func (s *RunningSession) startPolling() {
@@ -43,6 +52,7 @@ func (s *RunningSession) fetchMessagesFromSQS() {
 	curr := 0
 	prev := 0
 	for {
+		s.logVerbose("Polling for message (total so far %d)", curr)
 		msgResult, err := s.svc.ReceiveMessage(&sqs.ReceiveMessageInput{
 			QueueUrl:              &s.QueueArn,
 			MaxNumberOfMessages:   aws.Int64(MaxMessage),
@@ -56,7 +66,9 @@ func (s *RunningSession) fetchMessagesFromSQS() {
 			os.Exit(1)
 		}
 
-		curr += len(msgResult.Messages)
+		received := len(msgResult.Messages)
+		curr += received
+		s.logVerbose("Polled %d messages (total so far: %d)", received, curr)
 
 		for _, item := range msgResult.Messages {
 			s.writeLock.Lock()
@@ -70,6 +82,7 @@ func (s *RunningSession) fetchMessagesFromSQS() {
 
 		prev = curr
 	}
+	s.logVerbose("Poller finished with %d messages", curr)
 	s.wg.Done()
 }
 
@@ -80,6 +93,7 @@ func (s *RunningSession) createFile() {
 		fmt.Printf("Error in marshalling data %v\n", err)
 		os.Exit(1)
 	}
+	s.logVerbose("Writing output to %s", s.FileName)
 	err = os.WriteFile(s.FileName, file, 0644)
 	if err != nil {
 		fmt.Printf("Error in writing to file %v\n", err)
@@ -95,6 +109,7 @@ func (s *RunningSession) setPool() {
 	s.wg = &wg
 	s.writeLock = &sync.Mutex{}
 	s.purgeChannel = make(chan *sqs.Message)
+	s.logVerbose("Starting %d pollers", pollSize)
 }
 
 // Perform executes the root command to purge the SQS
@@ -115,6 +130,7 @@ func (s *RunningSession) triggerPollers() {
 }
 
 func (s *RunningSession) createAWSSession() {
+	s.logVerbose("Creating AWS session (region=%s, profile=%s)", s.Region, s.Profile)
 	awsSession, err := session.NewSession(&aws.Config{
 		Region:      aws.String(s.Region),
 		Credentials: credentials.NewSharedCredentials("", s.Profile),
@@ -130,6 +146,7 @@ func (s *RunningSession) createAWSSession() {
 
 func (s *RunningSession) deleteMessages() {
 	if s.PurgeQueue {
+		s.logVerbose("Starting purge of %d messages", len(s.messages))
 		for idx := 0; idx < s.pollSize; idx++ {
 			s.wg.Add(1)
 			go s.purgeConsumer()
