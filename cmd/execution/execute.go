@@ -46,6 +46,8 @@ func (s *RunningSession) fetchMessagesFromSQS() {
 		msgResult, err := s.svc.ReceiveMessage(&sqs.ReceiveMessageInput{
 			QueueUrl:              &s.QueueArn,
 			MaxNumberOfMessages:   aws.Int64(MaxMessage),
+			WaitTimeSeconds:       aws.Int64(0),
+			AttributeNames:        aws.StringSlice([]string{"All"}),
 			MessageAttributeNames: aws.StringSlice([]string{"All"}),
 		})
 
