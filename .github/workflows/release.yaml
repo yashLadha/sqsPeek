@@ -25,3 +25,8 @@ jobs:
           goarch: ${{ matrix.goarch }}
           goversion: "1.26.0"
           binary_name: "sqsPeek"
+          extra_files: LICENSE README.md
+          build_flags: -v
+          ldflags: -s -w
+        env:
+          CGO_ENABLED: 0
