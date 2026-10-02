@@ -1,0 +1,66 @@
+name: Build Release Binaries
+
+on:
+  workflow_call:
+    inputs:
+      ref:
+        description: Tag ref of the release the binaries are uploaded to
+        required: true
+        type: string
+
+jobs:
+  binaries:
+    name: ${{ matrix.target }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: ubuntu-latest, target: x86_64-unknown-linux-musl }
+          - { os: ubuntu-latest, target: i686-unknown-linux-musl }
+          - { os: ubuntu-latest, target: aarch64-unknown-linux-musl }
+          - { os: windows-latest, target: x86_64-pc-windows-msvc }
+          - { os: windows-latest, target: i686-pc-windows-msvc }
+          - { os: macos-latest, target: x86_64-apple-darwin }
+          - { os: macos-latest, target: aarch64-apple-darwin }
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+          components: llvm-tools
+      - uses: taiki-e/setup-cross-toolchain-action@v1
+        if: runner.os == 'Linux'
+        with:
+          target: ${{ matrix.target }}
+      - name: Build
+        run: cargo build --release --locked --target ${{ matrix.target }}
+      # macOS has no static libSystem, so the best possible there is linking only OS-provided libraries.
+      - name: Verify there are no non-system dynamic dependencies
+        shell: bash
+        run: |
+          bin=target/${{ matrix.target }}/release/sqsPeek
+          case "$RUNNER_OS" in
+            Linux)
+              file "$bin"
+              file "$bin" | grep -Eq 'statically linked|static-pie linked'
+              ;;
+            macOS)
+              otool -L "$bin"
+              ! otool -L "$bin" | tail -n +2 | grep -Ev '^[[:space:]]+(/usr/lib/|/System/Library/)'
+              ;;
+            Windows)
+              objdump="$(rustc --print sysroot)/lib/rustlib/$(rustc -vV | sed -n 's/^host: //p')/bin/llvm-objdump.exe"
+              "$objdump" -p "$bin.exe" | grep 'DLL Name'
+              ! "$objdump" -p "$bin.exe" | grep -Eiq 'DLL Name: *(vcruntime|msvcp|ucrtbase|api-ms-win-crt)'
+              ;;
+          esac
+      - uses: taiki-e/upload-rust-binary-action@v1
+        with:
+          bin: sqsPeek
+          target: ${{ matrix.target }}
+          archive: sqsPeek-$tag-$target
+          tar: unix
+          zip: windows
+          token: ${{ secrets.GITHUB_TOKEN }}
+          ref: ${{ inputs.ref }}
