@@ -21,3 +21,6 @@ anyhow = "1.0.104"
 
 [profile.release]
 strip = true
+# Favour runtime speed over build time: whole-program optimisation in a single unit.
+lto = "fat"
+codegen-units = 1
