@@ -7,6 +7,11 @@ on:
 permissions:
   contents: write
 
+# Every run deletes and recreates the head release, so overlapping runs would clobber each other.
+concurrency:
+  group: head-release
+  cancel-in-progress: true
+
 jobs:
   check:
     uses: ./.github/workflows/ci.yaml
