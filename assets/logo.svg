@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="160" height="160" viewBox="0 0 160 160" role="img" aria-labelledby="title">
+  <title id="title">sqsPeek</title>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#FF4F8B"/>
+      <stop offset="1" stop-color="#8C1BD6"/>
+    </linearGradient>
+    <clipPath id="lens">
+      <circle cx="102" cy="76" r="25"/>
+    </clipPath>
+  </defs>
+  <rect width="160" height="160" rx="36" fill="url(#bg)"/>
+  <g fill="#FFFFFF">
+    <rect x="26" y="40" width="80" height="16" rx="8" opacity="0.4"/>
+    <rect x="26" y="68" width="80" height="16" rx="8" opacity="0.65"/>
+    <rect x="26" y="96" width="80" height="16" rx="8" opacity="0.9"/>
+  </g>
+  <g clip-path="url(#lens)">
+    <circle cx="102" cy="76" r="25" fill="#2A0A3D" opacity="0.8"/>
+    <path d="M94 66 l-8 10 l8 10 M110 66 l8 10 l-8 10" fill="none" stroke="#FFFFFF" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+  <circle cx="102" cy="76" r="25" fill="none" stroke="#FFFFFF" stroke-width="8"/>
+  <line x1="121" y1="95" x2="136" y2="110" stroke="#FFFFFF" stroke-width="11" stroke-linecap="round"/>
+</svg>
